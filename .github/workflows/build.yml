@@ -18,18 +18,25 @@ jobs:
           distribution: 'zulu'
 
       - name: Download Morphe Tools
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p tools
           
           echo "Downloading CLI..."
-          CLI_URL=$(curl -s https://api.github.com/repos/MorpheApp/morphe-cli/releases/latest | grep "browser_download_url.*\.jar" | cut -d '"' -f 4 | head -n 1)
+          # GitHub Token use kiya gaya hai taaki API rate limit ka error na aaye
+          CLI_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-cli/releases/latest | grep "browser_download_url.*\.jar" | cut -d '"' -f 4 | head -n 1)
+          echo "Found CLI URL: $CLI_URL"
           wget -qO tools/cli.jar "$CLI_URL"
           
           echo "Downloading Patches..."
-          PATCHES_URL=$(curl -s https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest | grep "browser_download_url" | grep -E "\.jar|\.rvp" | cut -d '"' -f 4 | head -n 1)
+          # Extensions me .mpp bhi add kiya gaya hai safety ke liye
+          PATCHES_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest | grep "browser_download_url" | grep -E "\.jar|\.rvp|\.mpp" | cut -d '"' -f 4 | head -n 1)
+          echo "Found Patches URL: $PATCHES_URL"
           wget -qO tools/patches.jar "$PATCHES_URL"
           
-          # Verification
+          # Verification details add kiye gaye hain
+          ls -lh tools/
           if [ ! -s tools/cli.jar ] || [ ! -s tools/patches.jar ]; then 
             echo "Error: Tools download failed or file empty!"; exit 1; 
           fi
