@@ -30,11 +30,15 @@ jobs:
           
           echo "Downloading CLI..."
           CLI_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-cli/releases/latest | grep "browser_download_url.*\.jar" | cut -d '"' -f 4 | head -n 1)
+          CLI_FILENAME=$(basename "$CLI_URL")
+          echo "CLI_FILENAME=$CLI_FILENAME" >> $GITHUB_ENV
           echo "Found CLI URL: $CLI_URL"
           wget -qO tools/cli.jar "$CLI_URL"
           
           echo "Downloading Patches..."
           PATCHES_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest | grep "browser_download_url" | grep -E "\.jar|\.rvp|\.mpp" | cut -d '"' -f 4 | head -n 1)
+          PATCH_FILENAME=$(basename "$PATCHES_URL")
+          echo "PATCH_FILENAME=$PATCH_FILENAME" >> $GITHUB_ENV
           echo "Found Patches URL: $PATCHES_URL"
           wget -qO tools/patches.jar "$PATCHES_URL"
           
@@ -55,12 +59,14 @@ jobs:
           if [ -z "$YT_PATH" ]; then echo "YouTube APK not found!"; exit 1; fi
           echo "Downloading YouTube: $YT_PATH"
           curl -f -L -s "https://archive.org/download/jhc-apks/$YT_PATH" -o apks/youtube.apk
+          echo "YT_CLEAN_NAME=$(basename "$YT_PATH" .apk)" >> $GITHUB_ENV
           
           # YT Music Download
           YTM_PATH=$(curl -s "https://archive.org/metadata/jhc-apks" | jq -r '.files[].name' | grep -i "youtube.music" | grep "\.apk$" | sort | tail -n 1)
           if [ -z "$YTM_PATH" ]; then echo "YT Music APK not found!"; exit 1; fi
           echo "Downloading YT Music: $YTM_PATH"
           curl -f -L -s "https://archive.org/download/jhc-apks/$YTM_PATH" -o apks/ytmusic.apk
+          echo "YTM_CLEAN_NAME=$(basename "$YTM_PATH" .apk)" >> $GITHUB_ENV
 
           echo "--- Scanning for Reddit APK ---"
           REDDIT_DOWNLOADED=false
@@ -144,10 +150,38 @@ jobs:
           
           cd yt-magisk && zip -r9 ../YouTube-Magisk.zip . && cd ..
 
+      - name: Generate Release Notes
+        run: |
+          cat <<EOF > release_notes.txt
+          🚀 **New Morphe Build**
+          
+          📱 **YouTube:** $YT_CLEAN_NAME
+          🎵 **YouTube Music:** $YTM_CLEAN_NAME
+          
+          ---
+          
+          ### 📌 Required Add-ons
+          * **Install MicroG-RE:** [MicroG-RE Releases](https://github.com/morpheapp/MicroG-RE/releases) 
+            *(for non-root YouTube and YT Music APKs)*
+          * **Use Zygisk-Detach:** [Zygisk-Detach Releases](https://github.com/j-hc/zygisk-detach) 
+            *(to detach root Morphe YouTube and YT Music from Play Store)*
+          
+          ---
+          
+          ### 🛠️ Build Tools Used
+          * **CLI:** MorpheApp/$CLI_FILENAME
+          * **Patches:** MorpheApp/$PATCH_FILENAME
+          
+          ### 📝 Changelog
+          * Check the official patches changelog here: [Morphe Patches Latest Release](https://github.com/MorpheApp/morphe-patches/releases/latest)
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v1.0.${{ github.run_number }}"
+          name: "Morphe Patched Builds #${{ github.run_number }}"
+          body_path: release_notes.txt
           files: |
             *.apk
             *.zip
