@@ -111,13 +111,13 @@ jobs:
       - name: Build Non-Root APKs
         run: |
           echo "Patching YouTube Non-Root..."
-          java -jar tools/cli.jar patch -p tools/patches.jar -o YouTube-NonRoot.apk apks/youtube.apk
+          java -jar tools/cli.jar patch -p tools/patches.jar -o "${YT_CLEAN_NAME}-NonRoot.apk" apks/youtube.apk
           echo "Patching YT Music Non-Root..."
-          java -jar tools/cli.jar patch -p tools/patches.jar -o YTMusic-NonRoot.apk apks/ytmusic.apk
+          java -jar tools/cli.jar patch -p tools/patches.jar -o "${YTM_CLEAN_NAME}-NonRoot.apk" apks/ytmusic.apk
           
           if [ -f "apks/reddit.apk" ]; then
              echo "Patching Reddit Non-Root..."
-             java -jar tools/cli.jar patch -p tools/patches.jar -o Reddit-NonRoot.apk apks/reddit.apk || echo "Reddit patching failed, skipping..."
+             java -jar tools/cli.jar patch -p tools/patches.jar -o "Reddit-NonRoot.apk" apks/reddit.apk || echo "Reddit patching failed, skipping..."
           else
              echo "Reddit APK not found. Skipping Reddit Non-Root patching."
           fi
@@ -138,25 +138,46 @@ jobs:
 
       - name: Create Magisk Modules
         run: |
+          # YouTube Magisk Module
           mkdir -p yt-magisk/system/product/app/YouTube
           cp YouTube-Root.apk yt-magisk/system/product/app/YouTube/YouTube.apk
           
           cat <<EOF > yt-magisk/module.prop
           id=morphe.yt
-          name=YouTube Morphe
+          name=YouTube Morphe (Root)
           version=1.0
           author=Builder
           EOF
           
-          cd yt-magisk && zip -r9 ../YouTube-Magisk.zip . && cd ..
+          cd yt-magisk && zip -r9 "../${YT_CLEAN_NAME}.zip" . && cd ..
+          
+          # YT Music Magisk Module
+          mkdir -p ytm-magisk/system/product/app/YTMusic
+          cp YTMusic-Root.apk ytm-magisk/system/product/app/YTMusic/YTMusic.apk
+          
+          cat <<EOF > ytm-magisk/module.prop
+          id=morphe.ytm
+          name=YT Music Morphe (Root)
+          version=1.0
+          author=Builder
+          EOF
+          
+          cd ytm-magisk && zip -r9 "../${YTM_CLEAN_NAME}.zip" . && cd ..
 
       - name: Generate Release Notes
         run: |
+          if [ -f "apks/reddit.apk" ]; then
+            REDDIT_TEXT="Included"
+          else
+            REDDIT_TEXT="Skipped"
+          fi
+          
           cat <<EOF > release_notes.txt
           🚀 **New Morphe Build**
           
           📱 **YouTube:** $YT_CLEAN_NAME
           🎵 **YouTube Music:** $YTM_CLEAN_NAME
+          🤖 **Reddit:** $REDDIT_TEXT
           
           ---
           
@@ -177,13 +198,32 @@ jobs:
           EOF
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v1.0.${{ github.run_number }}"
           name: "Morphe Patched Builds #${{ github.run_number }}"
           body_path: release_notes.txt
           files: |
-            *.apk
+            *NonRoot.apk
             *.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # NAYA STEP: Telegram par notification bhejne ke liye
+      - name: Send Telegram Notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: markdown
+          message: |
+            🚀 *New Morphe Build is Ready!*
+            
+            📱 *YouTube:* `${{ env.YT_CLEAN_NAME }}`
+            🎵 *YT Music:* `${{ env.YTM_CLEAN_NAME }}`
+            
+            📥 *Download Links:*
+            [Click here to Download APKs & Magisk Modules](https://github.com/${{ github.repository }}/releases/tag/v1.0.${{ github.run_number }})
+            
+            _Note: Files are hosted on GitHub to bypass Telegram's 50MB bot upload limit._
