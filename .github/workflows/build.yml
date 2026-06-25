@@ -2,10 +2,15 @@ name: Build Morphe APKs and Magisk Modules
 
 on:
   workflow_dispatch:
+  schedule:
+    # Ye script har din automatic run hogi (raat 10:30 UTC = subah 4:00 IST)
+    - cron: '30 22 * * *'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
