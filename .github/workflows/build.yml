@@ -121,7 +121,7 @@ jobs:
 
       - name: Create Magisk Modules
         run: |
-          # Advanced Universal Magisk Installer (With post-fs-data.sh hook)
+          # Advanced Telegram-Style Magisk Installer (Auto-Downgrade & Lib Extraction)
           mkdir -p template/META-INF/com/google/android
           touch template/META-INF/com/google/android/updater-script
           
@@ -130,30 +130,61 @@ jobs:
           OUTFD=$2
           ZIPFILE=$3
           ui_print() { echo -n -e "ui_print $1\n" >&$OUTFD; echo -n -e "ui_print\n" >&$OUTFD; }
-          ui_print "- Installing Morphe Root Module..."
+          
+          ui_print "----------------------------------------"
+          ui_print "   Morphe Advanced Root Installer       "
+          ui_print "----------------------------------------"
+          
           if [ -d "/data/adb/ksu" ]; then MODDIR="/data/adb/ksu/modules"; elif [ -d "/data/adb/ap" ]; then MODDIR="/data/adb/ap/modules"; else MODDIR="/data/adb/modules"; fi
           MODID=$(grep '^id=' "$ZIPFILE" | head -n1 | cut -d= -f2 | tr -d '\r')
           MODPATH="$MODDIR/$MODID"
+          PKGNAME=$(grep '^package=' "$ZIPFILE" | head -n1 | cut -d= -f2 | tr -d '\r')
+          
           rm -rf "$MODPATH"
           mkdir -p "$MODPATH"
-          unzip -o "$ZIPFILE" -x "META-INF/*" -d "$MODPATH" >&2
+          
+          ui_print "- Downgrade detected, uninstalling old version..."
+          pm uninstall "$PKGNAME" >/dev/null 2>&1
+          pm uninstall --user 0 "$PKGNAME" >/dev/null 2>&1
+          
+          ui_print "- Extracting App..."
+          unzip -qo "$ZIPFILE" "app.apk" -d "$MODPATH"
+          unzip -qo "$ZIPFILE" "module.prop" -d "$MODPATH"
+          unzip -qo "$ZIPFILE" "post-fs-data.sh" -d "$MODPATH"
+          
+          ui_print "- Extracting Native Libs From Bundle APKs..."
+          mkdir -p "$MODPATH/lib/arm64-v8a" "$MODPATH/lib/armeabi-v7a"
+          unzip -jo "$MODPATH/app.apk" "lib/arm64-v8a/*" -d "$MODPATH/lib/arm64-v8a" >/dev/null 2>&1
+          unzip -jo "$MODPATH/app.apk" "lib/armeabi-v7a/*" -d "$MODPATH/lib/armeabi-v7a" >/dev/null 2>&1
+          
+          ui_print "- Mounting & Optimizing Morphe..."
           chmod -R 755 "$MODPATH"
           find "$MODPATH" -type f -exec chmod 644 {} +
           chmod 755 "$MODPATH/post-fs-data.sh" 2>/dev/null
-          ui_print "- Done! Please Reboot."
+          
+          ui_print "- Module installed successfully! Please Reboot."
           exit 0
           EOF
           chmod 755 template/META-INF/com/google/android/update-binary
 
           # YouTube Root Module Build
           cp -r template yt-magisk
-          cp YouTube-Root.apk yt-magisk/YouTube.apk
-          echo -e "id=morphe.yt\nname=YouTube Morphe (Root)\nversion=1.0\nauthor=${{ github.actor }}\ndescription=Morphe patched YouTube." > yt-magisk/module.prop
+          cp YouTube-Root.apk yt-magisk/app.apk
+          echo -e "id=morphe.yt\npackage=com.google.android.youtube\nname=YouTube Morphe (Advanced Root)\nversion=1.0\nauthor=${{ github.actor }}\ndescription=Morphe patched YouTube with auto-downgrade and dynamic mount." > yt-magisk/module.prop
+          
           cat << 'EOF' > yt-magisk/post-fs-data.sh
           #!/system/bin/sh
           MODDIR=${0%/*}
-          for path in /system/app/YouTube/YouTube.apk /system/product/app/YouTube/YouTube.apk /product/app/YouTube/YouTube.apk /data/app/*YouTube*/base.apk; do
-              if [ -f "$path" ]; then mount -o bind "$MODDIR/YouTube.apk" "$path"; fi
+          # Har phone me base.apk ka path alag hota hai, ye script automatically dhoondh legi
+          for base in "YouTube.apk" "base.apk"; do
+              for dir in /system/app/YouTube /system/product/app/YouTube /product/app/YouTube /system_ext/app/YouTube; do
+                  path="$dir/$base"
+                  if [ -f "$path" ]; then 
+                      mount -o bind "$MODDIR/app.apk" "$path"
+                      chcon u:object_r:apk_data_file:s0 "$path" 2>/dev/null
+                      break 2
+                  fi
+              done
           done
           EOF
           chmod 755 yt-magisk/post-fs-data.sh
@@ -161,13 +192,21 @@ jobs:
 
           # YT Music Root Module Build
           cp -r template ytm-magisk
-          cp YTMusic-Root.apk ytm-magisk/YTMusic.apk
-          echo -e "id=morphe.ytm\nname=YT Music Morphe (Root)\nversion=1.0\nauthor=${{ github.actor }}\ndescription=Morphe patched YT Music." > ytm-magisk/module.prop
+          cp YTMusic-Root.apk ytm-magisk/app.apk
+          echo -e "id=morphe.ytm\npackage=com.google.android.apps.youtube.music\nname=YT Music Morphe (Advanced Root)\nversion=1.0\nauthor=${{ github.actor }}\ndescription=Morphe patched YT Music with auto-downgrade and dynamic mount." > ytm-magisk/module.prop
+          
           cat << 'EOF' > ytm-magisk/post-fs-data.sh
           #!/system/bin/sh
           MODDIR=${0%/*}
-          for path in /system/app/YTMusic/YTMusic.apk /system/product/app/YTMusic/YTMusic.apk /product/app/YTMusic/YTMusic.apk /data/app/*Music*/base.apk; do
-              if [ -f "$path" ]; then mount -o bind "$MODDIR/YTMusic.apk" "$path"; fi
+          for base in "YTMusic.apk" "base.apk"; do
+              for dir in /system/app/YTMusic /system/product/app/YTMusic /product/app/YTMusic /system_ext/app/YTMusic; do
+                  path="$dir/$base"
+                  if [ -f "$path" ]; then 
+                      mount -o bind "$MODDIR/app.apk" "$path"
+                      chcon u:object_r:apk_data_file:s0 "$path" 2>/dev/null
+                      break 2
+                  fi
+              done
           done
           EOF
           chmod 755 ytm-magisk/post-fs-data.sh
