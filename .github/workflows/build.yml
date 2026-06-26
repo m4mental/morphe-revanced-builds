@@ -37,6 +37,7 @@ jobs:
           echo "Fetching Morphe Patches (Latest Stable)..."
           curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest > patches_api.json
           
+          # Smart Search: .jar -> .rvp -> .mpp -> Any other file (except .json)
           PATCHES_URL=$(grep "browser_download_url" patches_api.json | cut -d '"' -f 4 | grep "\.jar" | head -n 1)
           if [ -z "$PATCHES_URL" ]; then
             PATCHES_URL=$(grep "browser_download_url" patches_api.json | cut -d '"' -f 4 | grep "\.rvp" | head -n 1)
@@ -102,11 +103,23 @@ jobs:
 
       - name: Build Root APKs (For Magisk)
         run: |
+          # EXCLUDE SPECIFIC MORPHE PATCHES FOR MOUNTING:
+          # Excluded GmsCore, Package Name, Custom Branding, and Play Store updates
           echo "Building YouTube Root..."
-          java -jar tools/cli.jar patch -p tools/patches.jar -e gmscore-support -e "GmsCore support" -e microg-support -e "MicroG support" -e custom-package-name -e "Custom package name" -o YouTube-Root.apk apks/youtube.apk
+          java -jar tools/cli.jar patch -p tools/patches.jar \
+            -e "GmsCore support" \
+            -e "Package name of YouTube" \
+            -e "Custom branding" \
+            -e "Disable Play Store updates" \
+            -o YouTube-Root.apk apks/youtube.apk
           
           echo "Building YT Music Root..."
-          java -jar tools/cli.jar patch -p tools/patches.jar -e gmscore-support -e "GmsCore support" -e microg-support -e "MicroG support" -e custom-package-name -e "Custom package name" -o YTMusic-Root.apk apks/ytmusic.apk
+          java -jar tools/cli.jar patch -p tools/patches.jar \
+            -e "GmsCore support" \
+            -e "Package name of YouTube Music" \
+            -e "Custom branding" \
+            -e "Disable Play Store updates" \
+            -o YTMusic-Root.apk apks/ytmusic.apk
 
       - name: Create Magisk Modules
         run: |
@@ -148,14 +161,16 @@ jobs:
           
           # Check if custom recovery is used
           if [ -z "\$(pgrep system_server)" ] || [ -z "\$(getprop sys.boot_completed)" ]; then
-              ui_print "- WARNING: Flashing in Custom Recovery. Cannot auto-install Stock APK."
+              ui_print "- WARNING: Flashing in Custom Recovery."
+              ui_print "- Cannot auto-install Stock APK in Recovery mode."
               ui_print "- Please make sure the matching stock version is installed manually!"
           else
               ui_print "- Installing/Updating matching stock $APP_NAME..."
               if [ -f "\$MODPATH/stock.apk" ]; then
-                  # Safely install stock apk (it will overwrite split apks correctly)
-                  pm install -r -d "\$MODPATH/stock.apk" >/dev/null 2>&1
-                  ui_print "- Stock APK successfully aligned and installed."
+                  APK_SIZE=\$(stat -c %s "\$MODPATH/stock.apk")
+                  # Stream the APK into package manager to bypass any file permission restrictions
+                  cat "\$MODPATH/stock.apk" | pm install -r -d -S \$APK_SIZE >/dev/null 2>&1
+                  ui_print "- Stock APK successfully installed & aligned."
               else
                   ui_print "- ERROR: stock.apk not found!"
               fi
@@ -184,10 +199,11 @@ jobs:
           # Locate official app path
           TARGET_PATH=\$(pm path "\$PKG" | head -n 1 | cut -d':' -f2)
           
-          # Fallback: If missing, auto-install stock APK from module
+          # Fallback: If missing, auto-install stock APK from module using streaming method
           if [ -z "\$TARGET_PATH" ] && [ -f "\$MODDIR/stock.apk" ]; then
-              pm install -r "\$MODDIR/stock.apk" >/dev/null 2>&1
-              sleep 3
+              APK_SIZE=\$(stat -c %s "\$MODDIR/stock.apk")
+              cat "\$MODDIR/stock.apk" | pm install -r -S \$APK_SIZE >/dev/null 2>&1
+              sleep 5
               TARGET_PATH=\$(pm path "\$PKG" | head -n 1 | cut -d':' -f2)
           fi
           
