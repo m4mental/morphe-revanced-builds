@@ -64,24 +64,26 @@ jobs:
         run: |
           mkdir -p apks
           
-          # wget automatically follows redirects, ensuring the actual large APK is downloaded, not an HTML page
+          # Archive.org bot samajh kar block kar raha tha, isliye ab 'curl -L' ke sath fake Chrome User-Agent use kar rahe hain
           echo "Downloading YouTube APK..."
-          wget -qO apks/youtube.apk "https://archive.org/download/jhc-apks/apks/com.google.android.youtube/youtube_v19.16.39.apk"
+          curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36)" "https://archive.org/download/jhc-apks/apks/com.google.android.youtube/youtube_v19.16.39.apk" -o apks/youtube.apk
           
           echo "Downloading YT Music APK..."
-          wget -qO apks/ytmusic.apk "https://archive.org/download/jhc-apks/apks/com.google.android.apps.youtube.music/ytmusic_v7.05.51.apk"
+          curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36)" "https://archive.org/download/jhc-apks/apks/com.google.android.apps.youtube.music/ytmusic_v7.05.51.apk" -o apks/ytmusic.apk
           
-          # Verification: Check if downloaded file is greater than 10MB to avoid corrupted file errors
+          # Verification: Ensure file size is valid (not a 1KB HTML error page)
           YT_SIZE=$(stat -c%s "apks/youtube.apk" 2>/dev/null || echo 0)
+          echo "Downloaded YouTube Size: $YT_SIZE bytes"
+          
           if [ "$YT_SIZE" -lt 10000000 ]; then 
-            echo "Error: YouTube APK download failed or file is corrupted! Fix the Archive.org link."
+            echo "Error: YouTube APK download failed or file is corrupted!"
+            echo "Ho sakta hai Archive.org ki link dead ho. Kripya URL check karein."
             exit 1
           fi
           echo "Original APKs downloaded successfully!"
 
       - name: Build Non-Root APKs
         run: |
-          # Original safe syntax for CLI (Placing the input APK at the end)
           echo "Building YouTube Non-Root..."
           java -jar tools/cli.jar patch -p tools/patches.jar -o YouTube-NonRoot.apk apks/youtube.apk
           
@@ -90,22 +92,12 @@ jobs:
 
       - name: Build Root APKs (For Magisk)
         run: |
-          # 1. Using strict '=' syntax (--exclude=)
-          # 2. Placing input apk right at the end to ensure PicoCLI parses everything perfectly
-          
+          # Safe CLI syntax: input apk ko end me rakha hai aur single space ke sath exclude flags lagaye hain
           echo "Building YouTube Root..."
-          java -jar tools/cli.jar patch -p tools/patches.jar -o YouTube-Root.apk \
-            --exclude=gmscore-support \
-            --exclude=microg-support \
-            --exclude=custom-package-name \
-            apks/youtube.apk
+          java -jar tools/cli.jar patch -p tools/patches.jar -e gmscore-support -e microg-support -e custom-package-name -o YouTube-Root.apk apks/youtube.apk
           
           echo "Building YT Music Root..."
-          java -jar tools/cli.jar patch -p tools/patches.jar -o YTMusic-Root.apk \
-            --exclude=gmscore-support \
-            --exclude=microg-support \
-            --exclude=custom-package-name \
-            apks/ytmusic.apk
+          java -jar tools/cli.jar patch -p tools/patches.jar -e gmscore-support -e microg-support -e custom-package-name -o YTMusic-Root.apk apks/ytmusic.apk
 
       - name: Create Magisk Modules
         run: |
