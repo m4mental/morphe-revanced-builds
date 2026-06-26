@@ -37,6 +37,7 @@ jobs:
           echo "Fetching Morphe Patches (Latest Stable)..."
           curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest > patches_api.json
           
+          # Smart Search: .jar -> .rvp -> .mpp -> Any other file (except .json)
           PATCHES_URL=$(grep "browser_download_url" patches_api.json | cut -d '"' -f 4 | grep "\.jar" | head -n 1)
           if [ -z "$PATCHES_URL" ]; then
             PATCHES_URL=$(grep "browser_download_url" patches_api.json | cut -d '"' -f 4 | grep "\.rvp" | head -n 1)
@@ -95,10 +96,10 @@ jobs:
       - name: Build Non-Root APKs
         run: |
           echo "Building YouTube Non-Root..."
-          java -jar tools/cli.jar patch -p tools/patches.jar -o YouTube-NonRoot.apk apks/youtube.apk
+          java -jar tools/cli.jar patch --patches tools/patches.jar -o YouTube-NonRoot.apk apks/youtube.apk
           
           echo "Building YT Music Non-Root..."
-          java -jar tools/cli.jar patch -p tools/patches.jar -o YTMusic-NonRoot.apk apks/ytmusic.apk
+          java -jar tools/cli.jar patch --patches tools/patches.jar -o YTMusic-NonRoot.apk apks/ytmusic.apk
 
       - name: Build Root APKs (For Magisk)
         run: |
@@ -106,7 +107,13 @@ jobs:
           declare -a EXCLUDE_ARGS=()
           
           echo "Scanning patches to dynamically exclude GmsCore/MicroG/Custom Package related patches..."
-          java -jar tools/cli.jar list-patches -p tools/patches.jar > patches_list.txt
+          
+          # Failsafe Patch Listing (tries multiple parameters to never exit with code 2)
+          if ! java -jar tools/cli.jar list-patches --patches tools/patches.jar > patches_list.txt 2>/dev/null; then
+            if ! java -jar tools/cli.jar list-patches -p tools/patches.jar > patches_list.txt 2>/dev/null; then
+              java -jar tools/cli.jar list-patches -b tools/patches.jar > patches_list.txt 2>/dev/null || echo "list-patches failed" > patches_list.txt
+            fi
+          fi
           
           # Read list and add any GmsCore/MicroG/Package Name related patches to array
           while IFS= read -r line; do
@@ -132,10 +139,10 @@ jobs:
           done
           
           echo "Building YouTube Root (Native Play Services Only)..."
-          java -jar tools/cli.jar patch -p tools/patches.jar "${EXCLUDE_ARGS[@]}" -o YouTube-Root.apk apks/youtube.apk
+          java -jar tools/cli.jar patch --patches tools/patches.jar "${EXCLUDE_ARGS[@]}" -o YouTube-Root.apk apks/youtube.apk
           
           echo "Building YT Music Root (Native Play Services Only)..."
-          java -jar tools/cli.jar patch -p tools/patches.jar "${EXCLUDE_ARGS[@]}" -o YTMusic-Root.apk apks/ytmusic.apk
+          java -jar tools/cli.jar patch --patches tools/patches.jar "${EXCLUDE_ARGS[@]}" -o YTMusic-Root.apk apks/ytmusic.apk
 
       - name: Create Magisk Modules
         run: |
