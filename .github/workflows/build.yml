@@ -267,18 +267,18 @@ jobs:
 
       - name: Generate Changelog and Description
         run: |
-          # Safely write the release notes file using echo commands to prevent YAML template/indentation errors
-          echo "New build ke sath " > release_notes.txt
-          echo "YouTube: $YT_VERSION (arm-v7a, arm64-v8a)" >> release_notes.txt
-          echo "YouTube music: $YTM_VERSION (arm-v7a, arm64-v8a)" >> release_notes.txt
-          echo "" >> release_notes.txt
-          echo "Install MicroG-RE \"https://github.com/morpheapp/MicroG-RE/releases\" for non-root YouTube and YT Music APKs" >> release_notes.txt
-          echo "" >> release_notes.txt
-          echo "Use zygisk-detach \"https://github.com/j-hc/zygisk-detach\" to detach root Morphe YouTube and YT Music from Play Store" >> release_notes.txt
-          echo "" >> release_notes.txt
-          echo "CLI: MorpheApp/morphe-cli-1.9.1-all.jar" >> release_notes.txt
-          echo "Patches: MorpheApp/patches-1.32.0.mpp" >> release_notes.txt
-          echo "Changelog" >> release_notes.txt
+          # Safely write the release notes file using single-quoted echo commands to prevent parsing errors
+          echo 'New build ke sath' > release_notes.txt
+          echo 'YouTube: '"$YT_VERSION"' (arm-v7a, arm64-v8a)' >> release_notes.txt
+          echo 'YouTube music: '"$YTM_VERSION"' (arm-v7a, arm64-v8a)' >> release_notes.txt
+          echo '' >> release_notes.txt
+          echo 'Install MicroG-RE "https://github.com/morpheapp/MicroG-RE/releases" for non-root YouTube and YT Music APKs' >> release_notes.txt
+          echo '' >> release_notes.txt
+          echo 'Use zygisk-detach "https://github.com/j-hc/zygisk-detach" to detach root Morphe YouTube and YT Music from Play Store' >> release_notes.txt
+          echo '' >> release_notes.txt
+          echo 'CLI: MorpheApp/morphe-cli-1.9.1-all.jar' >> release_notes.txt
+          echo 'Patches: MorpheApp/patches-1.32.0.mpp' >> release_notes.txt
+          echo 'Changelog' >> release_notes.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
