@@ -23,21 +23,23 @@ jobs:
         run: |
           mkdir -p tools
           
-          echo "Fetching Morphe CLI..."
-          CLI_URL=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-cli/releases/latest | jq -r '.assets[] | select(.name | endswith(".jar")) | .browser_download_url' | head -n 1)
+          echo "Fetching Morphe CLI (Stable Only)..."
+          # 'map(select(.prerelease == false))' sirf aur sirf stable releases ko filter karega
+          CLI_URL=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-cli/releases | jq -r 'map(select(.prerelease == false)) | .[0].assets[] | select(.name | endswith(".jar")) | .browser_download_url' | head -n 1)
           
           if [ -z "$CLI_URL" ] || [ "$CLI_URL" == "null" ]; then 
-            echo "Error: CLI URL not found! Please check if the repository exists."; exit 1; 
+            echo "Error: Stable CLI URL not found! Please check repository."; exit 1;
           fi
           
           echo "Downloading from: $CLI_URL"
           wget -qO tools/cli.jar "$CLI_URL"
           
-          echo "Fetching Morphe Patches..."
-          PATCHES_URL=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest | jq -r '.assets[] | select(.name | endswith(".jar") or endswith(".rvp")) | .browser_download_url' | head -n 1)
+          echo "Fetching Morphe Patches (Stable Only)..."
+          # 'map(select(.prerelease == false))' strictly ignores beta/pre-releases
+          PATCHES_URL=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/MorpheApp/morphe-patches/releases | jq -r 'map(select(.prerelease == false)) | .[0].assets[] | select(.name | endswith(".jar") or endswith(".rvp")) | .browser_download_url' | head -n 1)
           
           if [ -z "$PATCHES_URL" ] || [ "$PATCHES_URL" == "null" ]; then 
-            echo "Error: Patches URL not found! Please check if the repository exists."; exit 1; 
+            echo "Error: Stable Patches URL not found! Please check repository."; exit 1;
           fi
           
           echo "Downloading from: $PATCHES_URL"
@@ -47,7 +49,7 @@ jobs:
           if [ ! -s tools/cli.jar ] || [ ! -s tools/patches.jar ]; then 
             echo "Error: Tools download failed or file empty!"; exit 1; 
           fi
-          echo "Tools verified successfully!"
+          echo "Stable Tools verified successfully!"
 
       - name: Download Original APKs
         run: |
