@@ -64,23 +64,43 @@ jobs:
         run: |
           mkdir -p apks
           
-          # Archive.org bot samajh kar block kar raha tha, isliye ab 'curl -L' ke sath fake Chrome User-Agent use kar rahe hain
+          echo "Fetching latest APK directory from Archive.org (jhc-apks)..."
+          # Archive.org ki metadata API ko call karke JSON save karna
+          curl -sL "https://archive.org/metadata/jhc-apks" > jhc_metadata.json
+          
+          # YouTube ka latest APK path extract karna (Version ke hisab se sort karke sabse naya uthana)
+          YT_PATH=$(jq -r '.files[].name' jhc_metadata.json | grep 'com.google.android.youtube/.*\.apk$' | sort -V | tail -n 1)
+          if [ -z "$YT_PATH" ]; then
+            echo "Error: YouTube APK directory me nahi mila!"
+            exit 1
+          fi
+          
+          # YT Music ka latest APK path extract karna
+          YTM_PATH=$(jq -r '.files[].name' jhc_metadata.json | grep 'com.google.android.apps.youtube.music/.*\.apk$' | sort -V | tail -n 1)
+          if [ -z "$YTM_PATH" ]; then
+            echo "Error: YT Music APK directory me nahi mila!"
+            exit 1
+          fi
+          
+          echo "Found Latest YouTube: $YT_PATH"
+          echo "Found Latest YT Music: $YTM_PATH"
+          
+          # Dynamically banayi gayi URL se download karna
           echo "Downloading YouTube APK..."
-          curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36)" "https://archive.org/download/jhc-apks/apks/com.google.android.youtube/youtube_v19.16.39.apk" -o apks/youtube.apk
+          curl -sL "https://archive.org/download/jhc-apks/$YT_PATH" -o apks/youtube.apk
           
           echo "Downloading YT Music APK..."
-          curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36)" "https://archive.org/download/jhc-apks/apks/com.google.android.apps.youtube.music/ytmusic_v7.05.51.apk" -o apks/ytmusic.apk
+          curl -sL "https://archive.org/download/jhc-apks/$YTM_PATH" -o apks/ytmusic.apk
           
-          # Verification: Ensure file size is valid (not a 1KB HTML error page)
+          # Verification: Ensure file size is valid (Corrupted html redirect nahi aaya)
           YT_SIZE=$(stat -c%s "apks/youtube.apk" 2>/dev/null || echo 0)
           echo "Downloaded YouTube Size: $YT_SIZE bytes"
           
           if [ "$YT_SIZE" -lt 10000000 ]; then 
             echo "Error: YouTube APK download failed or file is corrupted!"
-            echo "Ho sakta hai Archive.org ki link dead ho. Kripya URL check karein."
             exit 1
           fi
-          echo "Original APKs downloaded successfully!"
+          echo "Original APKs dynamically downloaded successfully!"
 
       - name: Build Non-Root APKs
         run: |
